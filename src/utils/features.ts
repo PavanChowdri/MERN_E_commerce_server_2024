@@ -2,7 +2,11 @@ import mongoose, { Document } from "mongoose";
 import { invalidateCacheProps, OrderItemType } from "../types/types.js";
 import { myCache } from "../app.js";
 import { Product } from "../models/product.js";
+import { UploadApiResponse, v2 as cloudinary } from "cloudinary";
+import { Stream } from "stream";
 import { Order } from "../models/order.js";
+import { error } from "console";
+import { url } from "inspector";
 export const connectDB = (url: string) => {
   mongoose
     .connect(url, {
@@ -126,4 +130,56 @@ export const getChartData = ({
   });
 
   return data;
+};
+
+const getBase64 = (file: Express.Multer.File) =>
+  `data:${file.mimetype};base64,${file.buffer.toString("base64")}`;
+
+const streamUpload = (
+  buffer: Buffer,
+  options = {}
+): Promise<UploadApiResponse> => {
+  return new Promise((resolve, reject) => {
+    const stream = cloudinary.uploader.upload_stream(
+      options,
+      (error, result) => {
+        if (result) {
+          resolve(result);
+        } else {
+          reject(error);
+        }
+      }
+    );
+    const bufferStream = new Stream.PassThrough();
+    bufferStream.end(buffer);
+    bufferStream.pipe(stream);
+  });
+};
+
+export const UploadToCloudinary = async (files: Express.Multer.File[]) => {
+  const promises = files.map(async (file) => {
+    return streamUpload(file.buffer, { folder: "upload" }); // Specify folder here if needed
+  });
+
+  const result = await Promise.all(promises);
+
+  return result.map((i) => ({
+    public_id: i.public_id,
+    url: i.secure_url,
+  }));
+};
+
+export const DeleteFromCloudinary = async (publicIds: string[]) => {
+  const promises = publicIds.map((id) => cloudinary.uploader.destroy(id));
+
+  const results = await Promise.allSettled(promises);
+
+  const deleted = results.filter((result) => result.status === "fulfilled");
+  const failed = results.filter((result) => result.status === "rejected");
+
+  return {
+    deleted: deleted.length,
+    failed: failed.length,
+    errors: failed.map((result) => (result as PromiseRejectedResult).reason),
+  };
 };

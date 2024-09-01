@@ -10,12 +10,12 @@ import {
   searchAllProducts,
   updateProduct,
 } from "../controllers/product.js";
-import { singleUpload } from "../middlewares/multer.js";
+import { singleUpload,multiUpload } from "../middlewares/multer.js";
 
 const app = express.Router();
 
 //To Create New Product -/api/v1/product/new
-app.post("/new", adminOnly, singleUpload, newProduct);
+app.post("/new", adminOnly, multiUpload, newProduct);
 
 // get searched products with filter - /api/v1/product/all
 app.get("/all", searchAllProducts);
@@ -31,6 +31,6 @@ app.get("/admin-products", getAdminProducts);
 
 app.route("/:id").get(getSingleProduct).delete(deleteProduct);
 
-app.put("/:id", singleUpload, updateProduct);
+app.put("/:id", multiUpload, updateProduct);
 
 export default app;
